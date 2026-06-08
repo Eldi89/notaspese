@@ -9,7 +9,7 @@ function persistExpenses(list){
   try{ localStorage.setItem(STORAGE_KEY,JSON.stringify(list)); }catch(e){}
 }
 
-const CAUSALI = ["Pasto di lavoro","Trasporto","Alloggio","Intrattenimento clienti","Materiale ufficio","Formazione","Altro"];
+const CAUSALI = ["Air/Auto Rental/Gas for Rental","Taxi / Tolls / Parking w/Tips","Travel Meals","Air","Lodging","Team Meals/Events","Travel/Metro","Dues/Memberships","Travel Train","Telephone"];
 const CLIENTI = ["Bertazzoni North America","Jungle USA","Serioplast North America","Marinaro Law Group","Altro / Personale"];
 
 const initialForm = { data:"", luogo:"", causale:"", partecipanti:"", importo:"", valuta:"USD", note:"", cliente:"" };
@@ -123,11 +123,17 @@ export default function ExpenseTracker(){
   const clearAll=()=>{ if(expenses.length===0) return; if(confirm(`Eliminare tutte le ${expenses.length} spese salvate? Assicurati di aver esportato il CSV prima.`)){ setExpenses([]); } };
 
   const exportCSV=()=>{
-    const headers=["Data","Luogo","Causale","Partecipanti","Importo","Valuta","Note","Cliente","Ricevuta"];
-    const rows=expenses.map(e=>[e.data,e.luogo,e.causale,e.partecipanti,e.importo,e.valuta,e.note,e.cliente,e.pdfName].map(v=>`"${(v||"").replace(/"/g,'""')}"`).join(","));
+    const cols=["Air/Auto Rental/Gas for Rental","Taxi / Tolls / Parking w/Tips","Travel Meals","Air","Lodging","Team Meals/Events","Travel/Metro","Dues/Memberships","Travel Train","Telephone"];
+    const headers=["DATE","VENDOR","BUSINESS PURPOSE OF EXPENSE:","ATTENDEES: (Required for Meals & Entertianment)",...cols,"Total","Cliente","Ricevuta"];
+    const rows=expenses.map(e=>{
+      const amt=parseFloat(e.importo||0)||0;
+      const catCells=cols.map(c=>c===e.causale?(amt?amt.toFixed(2):""):"");
+      const base=[e.data,e.luogo,e.note||"",e.partecipanti];
+      return [...base,...catCells,amt?amt.toFixed(2):"",e.cliente,e.pdfName].map(v=>`"${(String(v??"")).replace(/"/g,'""')}"`).join(",");
+    });
     const csv=[headers.join(","),...rows].join("\n");
     const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
-    const file=new File([blob],`nota_spese_${new Date().toISOString().slice(0,10)}.csv`,{type:"text/csv"});
+    const file=new File([blob],`LTA_nota_spese_${new Date().toISOString().slice(0,10)}.csv`,{type:"text/csv"});
     if(navigator.canShare&&navigator.canShare({files:[file]})){
       navigator.share({files:[file],title:"Nota Spese"}).catch(()=>{ const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download=file.name; a.click(); URL.revokeObjectURL(url); });
     }else{ const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download=file.name; a.click(); URL.revokeObjectURL(url); }
@@ -161,7 +167,7 @@ export default function ExpenseTracker(){
 
       <div style={{maxWidth:520,margin:"0 auto",padding:"24px 20px"}}>
         <div onDrop={handleDrop} onDragOver={e=>e.preventDefault()} onClick={()=>fileRef.current?.click()} style={{border:`1px dashed ${imagePreview?C.gold:C.border}`,borderRadius:"12px",padding:imagePreview?"0":"32px 20px",textAlign:"center",cursor:"pointer",background:C.card,overflow:"hidden",marginBottom:"16px",transition:"border-color .2s"}}>
-          <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>e.target.files[0]&&handleImage(e.target.files[0])}/>
+          <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>e.target.files[0]&&handleImage(e.target.files[0])}/>
           {imagePreview?(
             <div style={{position:"relative"}}>
               <img src={imagePreview} alt="receipt" style={{width:"100%",maxHeight:220,objectFit:"cover",display:"block"}}/>
@@ -170,7 +176,7 @@ export default function ExpenseTracker(){
               </div>
             </div>
           ):(
-            <><div style={{color:C.faint,marginBottom:"10px"}}><CameraIcon/></div><div style={{fontSize:"13px",color:C.dim,lineHeight:1.5}}>Tocca per fotografare la ricevuta<br/><span style={{fontSize:"11px",color:C.faint}}>o trascina qui l'immagine</span></div></>
+            <><div style={{color:C.faint,marginBottom:"10px"}}><CameraIcon/></div><div style={{fontSize:"13px",color:C.dim,lineHeight:1.5}}>Tocca per scattare o scegliere la ricevuta<br/><span style={{fontSize:"11px",color:C.faint}}>foto, libreria o file</span></div></>
           )}
         </div>
 
