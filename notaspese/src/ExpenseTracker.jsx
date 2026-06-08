@@ -10,9 +10,14 @@ function persistExpenses(list){
 }
 
 const CAUSALI = ["Air/Auto Rental/Gas for Rental","Taxi / Tolls / Parking w/Tips","Travel Meals","Air","Lodging","Team Meals/Events","Travel/Metro","Dues/Memberships","Travel Train","Telephone"];
-const CLIENTI = ["Bertazzoni North America","Jungle USA","Serioplast North America","Marinaro Law Group","Altro / Personale"];
+const CLIENTI_DEFAULT = ["SERIOPLAST","LTA","Bertazzoni North America","Jungle USA","Marinaro Law Group"];
+const PARTECIPANTI_DEFAULT = ["Eldi"];
+const CLIENTI_KEY = "notaspese:clienti";
+const PARTECIPANTI_KEY = "notaspese:partecipanti";
+function loadList(key,fallback){ try{ const raw=localStorage.getItem(key); return raw?JSON.parse(raw):fallback; }catch(e){ return fallback; } }
+function saveList(key,list){ try{ localStorage.setItem(key,JSON.stringify(list)); }catch(e){} }
 
-const initialForm = { data:"", luogo:"", causale:"", partecipanti:"", importo:"", valuta:"USD", note:"", cliente:"" };
+const initialForm = { data:"", luogo:"", causale:"", partecipanti:"Eldi", importo:"", valuta:"USD", note:"", cliente:"" };
 
 function formatCurrency(val){ if(!val) return ""; const n=parseFloat(val); return isNaN(n)?val:n.toFixed(2); }
 function slug(s){ return (s||"ricevuta").replace(/[^a-zA-Z0-9]+/g,"_").replace(/^_|_$/g,"").slice(0,30); }
@@ -39,6 +44,11 @@ export default function ExpenseTracker(){
   const fileRef=useRef();
 
   const [loaded,setLoaded]=useState(false);
+  const [clienti,setClienti]=useState(CLIENTI_DEFAULT);
+  const [partecipantiList,setPartecipantiList]=useState(PARTECIPANTI_DEFAULT);
+  useEffect(()=>{ setClienti(loadList(CLIENTI_KEY,CLIENTI_DEFAULT)); setPartecipantiList(loadList(PARTECIPANTI_KEY,PARTECIPANTI_DEFAULT)); },[]);
+  const addCliente=()=>{ const v=(prompt("Nuovo cliente:")||"").trim(); if(!v) return; const next=clienti.includes(v)?clienti:[...clienti,v]; setClienti(next); saveList(CLIENTI_KEY,next); setForm(p=>({...p,cliente:v})); };
+  const addPartecipante=()=>{ const v=(prompt("Nuovo partecipante:")||"").trim(); if(!v) return; const next=partecipantiList.includes(v)?partecipantiList:[...partecipantiList,v]; setPartecipantiList(next); saveList(PARTECIPANTI_KEY,next); setForm(p=>({...p,partecipanti:p.partecipanti?p.partecipanti+", "+v:v})); };
   useEffect(()=>{ setExpenses(loadExpenses()); setLoaded(true); },[]);
   useEffect(()=>{ if(loaded) persistExpenses(expenses); },[expenses,loaded]);
 
@@ -196,10 +206,10 @@ export default function ExpenseTracker(){
 
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px",marginBottom:"12px"}}>
           <div className="fg"><label>Causale</label><select value={form.causale} onChange={e=>setForm(p=>({...p,causale:e.target.value}))}><option value="">Seleziona...</option>{CAUSALI.map(c=><option key={c}>{c}</option>)}</select></div>
-          <div className="fg"><label>Partecipanti</label><input placeholder="es. Cliente ABC" value={form.partecipanti} onChange={e=>setForm(p=>({...p,partecipanti:e.target.value}))}/></div>
+          <div className="fg"><label>Partecipanti</label><div style={{display:"flex",gap:"6px"}}><input style={{flex:1}} placeholder="Eldi" value={form.partecipanti} onChange={e=>setForm(p=>({...p,partecipanti:e.target.value}))}/><button type="button" onClick={addPartecipante} style={{flexShrink:0,padding:"0 12px",borderRadius:"8px",background:"transparent",border:`1px solid ${C.gold}`,color:C.gold,fontSize:"12px",fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>+ New</button></div></div>
         </div>
 
-        <div className="fg" style={{marginBottom:"12px"}}><label>Cliente</label><select value={form.cliente} onChange={e=>setForm(p=>({...p,cliente:e.target.value}))}><option value="">Seleziona...</option>{CLIENTI.map(c=><option key={c}>{c}</option>)}</select></div>
+        <div className="fg" style={{marginBottom:"12px"}}><label>Cliente</label><div style={{display:"flex",gap:"6px"}}><select style={{flex:1}} value={form.cliente} onChange={e=>setForm(p=>({...p,cliente:e.target.value}))}><option value="">Seleziona...</option>{clienti.map(c=><option key={c}>{c}</option>)}</select><button type="button" onClick={addCliente} style={{flexShrink:0,padding:"0 12px",borderRadius:"8px",background:"transparent",border:`1px solid ${C.gold}`,color:C.gold,fontSize:"12px",fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>+ New</button></div></div>
 
         <div className="fg" style={{marginBottom:"16px"}}><label>Note</label><textarea rows={2} placeholder="Dettagli aggiuntivi..." value={form.note} style={{resize:"none"}} onChange={e=>setForm(p=>({...p,note:e.target.value}))}/></div>
 
