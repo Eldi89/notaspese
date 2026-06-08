@@ -159,13 +159,13 @@ export default function ExpenseTracker(){
         .row{animation:fadeIn .25s ease;}
       `}</style>
 
-      <div style={{borderBottom:`1px solid ${C.line}`,padding:"20px 24px",display:"flex",alignItems:"center",gap:"12px"}}>
+      <div style={{borderBottom:`1px solid ${C.line}`,padding:"20px 24px",paddingTop:"calc(env(safe-area-inset-top, 0px) + 20px)",display:"flex",alignItems:"center",gap:"12px",position:"sticky",top:0,background:C.bg,zIndex:10}}>
         <div style={{color:C.gold}}><ReceiptIcon/></div>
         <div><div style={{fontSize:"16px",fontWeight:600}}>Nota Spese</div><div style={{fontSize:"11px",color:C.dim,marginTop:"1px"}}>LTA US Advisors</div></div>
         {expenses.length>0&&(<button onClick={exportCSV} style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:"7px",background:"transparent",border:`1px solid #2e2e2e`,borderRadius:"8px",padding:"8px 14px",color:C.gold,fontSize:"12px",fontWeight:500,cursor:"pointer",fontFamily:"inherit"}}><ExportIcon/> Esporta CSV</button>)}
       </div>
 
-      <div style={{maxWidth:520,margin:"0 auto",padding:"24px 20px"}}>
+      <div style={{maxWidth:520,margin:"0 auto",padding:"24px 20px",paddingBottom:"calc(env(safe-area-inset-bottom, 0px) + 40px)"}}>
         <div onDrop={handleDrop} onDragOver={e=>e.preventDefault()} onClick={()=>fileRef.current?.click()} style={{border:`1px dashed ${imagePreview?C.gold:C.border}`,borderRadius:"12px",padding:imagePreview?"0":"32px 20px",textAlign:"center",cursor:"pointer",background:C.card,overflow:"hidden",marginBottom:"16px",transition:"border-color .2s"}}>
           <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>e.target.files[0]&&handleImage(e.target.files[0])}/>
           {imagePreview?(
