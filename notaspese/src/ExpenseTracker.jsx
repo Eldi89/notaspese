@@ -24,20 +24,59 @@ function slug(s){ return (s||"ricevuta").replace(/[^a-zA-Z0-9]+/g,"_").replace(/
 
 function ReceiptIcon(){return(<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 4v16l2-1 2 1 2-1 2 1 2-1 2 1 2-1V4l-2 1-2-1-2 1-2-1-2 1-2-1z"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg>);}
 function CameraIcon(){return(<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>);}
-function SpinnerIcon(){return(<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{animation:"spin 1s linear infinite"}}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>);}
 function CheckIcon(){return(<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>);}
 function TrashIcon(){return(<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>);}
 function ExportIcon(){return(<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>);}
 function SaveIcon(){return(<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>);}
 
+function CropBox({src,crop,setCrop,C}){
+  const ref=useRef(null);
+  const drag=useRef(null);
+  if(!crop) return null;
+  const getPoint=(e)=>{ const t=e.touches?e.touches[0]:e; const r=ref.current.getBoundingClientRect(); return { x:Math.min(1,Math.max(0,(t.clientX-r.left)/r.width)), y:Math.min(1,Math.max(0,(t.clientY-r.top)/r.height)) }; };
+  const onDown=(handle)=>(e)=>{ e.preventDefault(); e.stopPropagation(); drag.current={handle,start:getPoint(e),orig:{...crop}}; };
+  const onMove=(e)=>{
+    if(!drag.current) return;
+    const p=getPoint(e); const o=drag.current.orig; const h=drag.current.handle;
+    let {x,y,w,h:hh}=o;
+    if(h==="move"){ const dx=p.x-drag.current.start.x, dy=p.y-drag.current.start.y; x=Math.min(Math.max(0,o.x+dx),1-o.w); y=Math.min(Math.max(0,o.y+dy),1-o.h); }
+    else{
+      let x1=o.x, y1=o.y, x2=o.x+o.w, y2=o.y+o.h;
+      if(h.includes("w")) x1=Math.min(p.x,x2-0.08);
+      if(h.includes("e")) x2=Math.max(p.x,x1+0.08);
+      if(h.includes("n")) y1=Math.min(p.y,y2-0.08);
+      if(h.includes("s")) y2=Math.max(p.y,y1+0.08);
+      x=x1; y=y1; w=x2-x1; hh=y2-y1;
+    }
+    setCrop({x,y,w,h:hh});
+  };
+  const onUp=()=>{ drag.current=null; };
+  const pct=(n)=>`${n*100}%`;
+  const handle=(pos,cursor,h)=>(<div onMouseDown={onDown(h)} onTouchStart={onDown(h)} style={{position:"absolute",...pos,width:22,height:22,marginLeft:-11,marginTop:-11,borderRadius:"50%",background:C.gold,border:"2px solid #0f0f0f",cursor,touchAction:"none",zIndex:3}}/>);
+  return (
+    <div ref={ref} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp} onTouchMove={onMove} onTouchEnd={onUp}
+      style={{position:"relative",width:"100%",maxHeight:360,userSelect:"none",touchAction:"none",background:"#000",borderRadius:"10px",overflow:"hidden"}}>
+      <img src={src} alt="" style={{width:"100%",display:"block",maxHeight:360,objectFit:"contain",pointerEvents:"none"}}/>
+      <div onMouseDown={onDown("move")} onTouchStart={onDown("move")}
+        style={{position:"absolute",left:pct(crop.x),top:pct(crop.y),width:pct(crop.w),height:pct(crop.h),border:`2px solid ${C.gold}`,boxShadow:"0 0 0 9999px rgba(0,0,0,0.5)",cursor:"move",touchAction:"none",boxSizing:"border-box"}}>
+        {handle({left:0,top:0},"nwse-resize","nw")}
+        {handle({left:"100%",top:0},"nesw-resize","ne")}
+        {handle({left:0,top:"100%"},"nesw-resize","sw")}
+        {handle({left:"100%",top:"100%"},"nwse-resize","se")}
+      </div>
+    </div>
+  );
+}
+
 export default function ExpenseTracker(){
   const [form,setForm]=useState(initialForm);
   const [expenses,setExpenses]=useState([]);
-  const [imageData,setImageData]=useState(null);
   const [imagePreview,setImagePreview]=useState(null);
   const [imageDims,setImageDims]=useState(null);
-  const [scanning,setScanning]=useState(false);
-  const [scanResult,setScanResult]=useState(null);
+  const [fullImg,setFullImg]=useState(null);
+  const [crop,setCrop]=useState(null);
+  const [cropping,setCropping]=useState(false);
+  const [cropData,setCropData]=useState(null);
   const [saved,setSaved]=useState(false);
   const [pdfStatus,setPdfStatus]=useState(null);
   const [error,setError]=useState(null);
@@ -54,40 +93,45 @@ export default function ExpenseTracker(){
 
   const handleImage=useCallback(async(file)=>{
     if(!file) return;
-    setError(null); setScanResult(null); setPdfStatus(null);
-    const reader=new FileReader();
-    reader.onload=(e)=>{ setImagePreview(e.target.result); const img=new Image(); img.onload=()=>setImageDims({w:img.width,h:img.height}); img.src=e.target.result; };
-    reader.readAsDataURL(file);
-    const b64=await new Promise((res,rej)=>{ const r2=new FileReader(); r2.onload=()=>res(r2.result.split(",")[1]); r2.onerror=rej; r2.readAsDataURL(file); });
-    setImageData({data:b64,mediaType:file.type||"image/jpeg"});
-    await scanReceipt(b64,file.type||"image/jpeg");
-  },[]);
-
-  const scanReceipt=useCallback(async(b64,mediaType)=>{
-    setScanning(true);
-    try{
-      const res=await fetch("/api/scan",{
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({ image:b64, mediaType })
-      });
-      const data=await res.json();
-      const text=data.content?.find(b=>b.type==="text")?.text||"";
-      const parsed=JSON.parse(text.replace(/```json|```/g,"").trim());
-      setScanResult(parsed);
-      setForm(prev=>({...prev, data:parsed.data||prev.data, luogo:parsed.luogo||prev.luogo, importo:parsed.importo||prev.importo, valuta:parsed.valuta||prev.valuta, note:parsed.note||prev.note }));
-    }catch(e){ setError("Lettura automatica non riuscita. Inserisci i dati a mano."); }
-    finally{ setScanning(false); }
+    setError(null); setPdfStatus(null); setCrop(null);
+    const dataUrl=await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.target.result); r.onerror=rej; r.readAsDataURL(file); });
+    const img=new Image();
+    img.onload=()=>{
+      setImageDims({w:img.width,h:img.height});
+      setImagePreview(dataUrl);
+      setFullImg(dataUrl);
+      setCrop({x:0,y:0,w:1,h:1});
+      setCropping(true);
+    };
+    img.src=dataUrl;
   },[]);
 
   const handleDrop=useCallback((e)=>{ e.preventDefault(); const file=e.dataTransfer.files[0]; if(file&&file.type.startsWith("image/")) handleImage(file); },[handleImage]);
 
+  const confirmCrop=useCallback(()=>{
+    if(!fullImg||!crop||!imageDims) return;
+    const img=new Image();
+    img.onload=()=>{
+      const sx=Math.round(crop.x*imageDims.w), sy=Math.round(crop.y*imageDims.h);
+      const sw=Math.max(1,Math.round(crop.w*imageDims.w)), sh=Math.max(1,Math.round(crop.h*imageDims.h));
+      const canvas=document.createElement("canvas"); canvas.width=sw; canvas.height=sh;
+      const ctx=canvas.getContext("2d"); ctx.drawImage(img,sx,sy,sw,sh,0,0,sw,sh);
+      const dataUrl=canvas.toDataURL("image/jpeg",0.9);
+      setImagePreview(dataUrl);
+      setCropData({ data:dataUrl.split(",")[1], w:sw, h:sh });
+      setCropping(false);
+    };
+    img.src=fullImg;
+  },[fullImg,crop,imageDims]);
+
   const buildPdf=useCallback(()=>{
-    if(!imageData||!imageDims) return null;
-    const bin=atob(imageData.data); const len=bin.length; const bytes=new Uint8Array(len);
+    if(!cropData) return null;
+    const bin=atob(cropData.data); const len=bin.length; const bytes=new Uint8Array(len);
     for(let i=0;i<len;i++) bytes[i]=bin.charCodeAt(i);
+    const iw=cropData.w, ih=cropData.h;
     const pageW=595.28,pageH=841.89,margin=36;
     const maxW=pageW-margin*2,maxH=pageH-margin*2;
-    let dw=imageDims.w,dh=imageDims.h;
+    let dw=iw,dh=ih;
     const scale=Math.min(maxW/dw,maxH/dh,1); dw*=scale; dh*=scale;
     const x=(pageW-dw)/2,y=(pageH-dh)/2;
     const enc=(s)=>new TextEncoder().encode(s);
@@ -99,15 +143,15 @@ export default function ExpenseTracker(){
     offsets[3]=pos; push(`3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageW} ${pageH}] /Resources << /XObject << /Im0 5 0 R >> >> /Contents 4 0 R >>\nendobj\n`);
     const content=`q\n${dw.toFixed(2)} 0 0 ${dh.toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)} cm\n/Im0 Do\nQ\n`;
     offsets[4]=pos; push(`4 0 obj\n<< /Length ${enc(content).length} >>\nstream\n${content}endstream\nendobj\n`);
-    offsets[5]=pos; push(`5 0 obj\n<< /Type /XObject /Subtype /Image /Width ${imageDims.w} /Height ${imageDims.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${len} >>\nstream\n`);
+    offsets[5]=pos; push(`5 0 obj\n<< /Type /XObject /Subtype /Image /Width ${iw} /Height ${ih} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${len} >>\nstream\n`);
     push(bytes); push("\nendstream\nendobj\n");
     const xrefPos=pos; let xref=`xref\n0 6\n0000000000 65535 f \n`;
     for(let i=1;i<=5;i++) xref+=String(offsets[i]).padStart(10,"0")+" 00000 n \n";
     push(xref); push(`trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xrefPos}\n%%EOF`);
     return new Blob(parts,{type:"application/pdf"});
-  },[imageData,imageDims]);
+  },[cropData]);
 
-  const pdfFilename=()=>{ const d=form.data||new Date().toISOString().slice(0,10); const amt=form.importo?"_"+formatCurrency(form.importo):""; return `${d}_${slug(form.luogo)}${amt}.pdf`; };
+  const pdfFilename=()=>{ const d=form.data||new Date().toISOString().slice(0,10); const amt=form.importo?"_"+formatCurrency(form.importo):""; const cli=form.cliente?"_"+slug(form.cliente):""; return `${d}_${slug(form.luogo)}${amt}${cli}.pdf`; };
 
   const savePdf=useCallback(async()=>{
     const blob=buildPdf();
@@ -124,7 +168,7 @@ export default function ExpenseTracker(){
     setError(null);
     const newExp={...form, importo:formatCurrency(form.importo), id:Date.now(), receiptThumb:imagePreview, pdfName:imagePreview?pdfFilename():""};
     setExpenses(prev=>[newExp,...prev]);
-    setForm(initialForm); setImagePreview(null); setImageData(null); setImageDims(null); setScanResult(null); setPdfStatus(null);
+    setForm(initialForm); setImagePreview(null); setFullImg(null); setCrop(null); setCropData(null); setCropping(false); setImageDims(null); setPdfStatus(null);
     setSaved(true); setTimeout(()=>setSaved(false),2000);
   };
 
@@ -157,7 +201,6 @@ export default function ExpenseTracker(){
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
         *{box-sizing:border-box;margin:0;padding:0;}
-        @keyframes spin{to{transform:rotate(360deg);}}
         @keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
         input,select,textarea{outline:none;}
         input::placeholder,textarea::placeholder{color:#555;}
@@ -176,21 +219,33 @@ export default function ExpenseTracker(){
       </div>
 
       <div style={{maxWidth:520,margin:"0 auto",padding:"24px 20px",paddingBottom:"calc(env(safe-area-inset-bottom, 0px) + 40px)"}}>
+        {!cropping && (
         <div onDrop={handleDrop} onDragOver={e=>e.preventDefault()} onClick={()=>fileRef.current?.click()} style={{border:`1px dashed ${imagePreview?C.gold:C.border}`,borderRadius:"12px",padding:imagePreview?"0":"32px 20px",textAlign:"center",cursor:"pointer",background:C.card,overflow:"hidden",marginBottom:"16px",transition:"border-color .2s"}}>
           <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>e.target.files[0]&&handleImage(e.target.files[0])}/>
           {imagePreview?(
             <div style={{position:"relative"}}>
-              <img src={imagePreview} alt="receipt" style={{width:"100%",maxHeight:220,objectFit:"cover",display:"block"}}/>
-              <div style={{position:"absolute",inset:0,background:"linear-gradient(to top,#141414 0%,transparent 60%)",display:"flex",alignItems:"flex-end",padding:"12px 14px"}}>
-                {scanning?<div style={{display:"flex",alignItems:"center",gap:"8px",fontSize:"12px",color:C.gold}}><SpinnerIcon/> Analisi AI...</div>:scanResult?<div style={{display:"flex",alignItems:"center",gap:"7px",fontSize:"12px",color:C.green}}><CheckIcon/> Dati estratti</div>:null}
-              </div>
+              <img src={imagePreview} alt="receipt" style={{width:"100%",maxHeight:300,objectFit:"contain",display:"block",background:"#000"}}/>
             </div>
           ):(
             <><div style={{color:C.faint,marginBottom:"10px"}}><CameraIcon/></div><div style={{fontSize:"13px",color:C.dim,lineHeight:1.5}}>Tocca per scattare o scegliere la ricevuta<br/><span style={{fontSize:"11px",color:C.faint}}>foto, libreria o file</span></div></>
           )}
         </div>
+        )}
 
-        {imagePreview&&(<button onClick={savePdf} style={{width:"100%",padding:"11px",borderRadius:"10px",background:pdfStatus?"#1e3a20":"transparent",border:`1px solid ${pdfStatus?"#2e5a30":C.gold}`,color:pdfStatus?C.green:C.gold,fontSize:"13px",fontWeight:500,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:"8px",marginBottom:"20px"}}>{pdfStatus?<><CheckIcon/> PDF salvato</>:<><SaveIcon/> Salva PDF su Drive / File</>}</button>)}
+        {cropping && fullImg && (
+          <div style={{marginBottom:"16px"}}>
+            <div style={{fontSize:"12px",color:C.gold,marginBottom:"8px",textAlign:"center"}}>Trascina gli angoli per ritagliare la ricevuta</div>
+            <CropBox src={fullImg} crop={crop} setCrop={setCrop} C={C}/>
+            <div style={{display:"flex",gap:"8px",marginTop:"10px"}}>
+              <button onClick={()=>{setCrop({x:0,y:0,w:1,h:1});}} style={{flex:1,padding:"10px",borderRadius:"9px",background:"transparent",border:`1px solid ${C.border}`,color:C.dim,fontSize:"12px",cursor:"pointer",fontFamily:"inherit"}}>Tutta la foto</button>
+              <button onClick={confirmCrop} style={{flex:2,padding:"10px",borderRadius:"9px",background:C.gold,border:"none",color:"#0f0f0f",fontSize:"13px",fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Conferma ritaglio</button>
+            </div>
+          </div>
+        )}
+
+        {imagePreview && !cropping && (<button onClick={()=>{setCropping(true);}} style={{width:"100%",padding:"9px",borderRadius:"10px",background:"transparent",border:`1px solid ${C.border}`,color:C.dim,fontSize:"12px",cursor:"pointer",fontFamily:"inherit",marginBottom:"10px"}}>Ritaglia di nuovo</button>)}
+
+        {imagePreview&&!cropping&&(<button onClick={savePdf} style={{width:"100%",padding:"11px",borderRadius:"10px",background:pdfStatus?"#1e3a20":"transparent",border:`1px solid ${pdfStatus?"#2e5a30":C.gold}`,color:pdfStatus?C.green:C.gold,fontSize:"13px",fontWeight:500,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:"8px",marginBottom:"20px"}}>{pdfStatus?<><CheckIcon/> PDF salvato</>:<><SaveIcon/> Salva PDF su Drive / File</>}</button>)}
 
         {error&&<div style={{background:"#1a0e0e",border:"1px solid #3a1e1e",borderRadius:"8px",padding:"10px 14px",marginBottom:"16px",fontSize:"12px",color:"#e07070"}}>{error}</div>}
 
