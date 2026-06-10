@@ -76,7 +76,7 @@ export default function ExpenseTracker(){
   const [imagePreview,setImagePreview]=useState(null);
   const [imageDims,setImageDims]=useState(null);
   const [fullImg,setFullImg]=useState(null);
-  const [crop,setCrop]=useState(null); // {x,y,w,h} relative 0..1
+  const [crop,setCrop]=useState(null);
   const [cropping,setCropping]=useState(false);
   const [cropData,setCropData]=useState(null);
   const [saved,setSaved]=useState(false);
@@ -95,37 +95,31 @@ export default function ExpenseTracker(){
 
   const handleImage=useCallback(async(file)=>{
     if(!file) return;
-    setError(null); setPdfStatus(null); setCrop(null);
-    const dataUrl=await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.target.result); r.onerror=rej; r.readAsDataURL(file); });
-    const img=new Image();
-    img.onload=()=>{
-      setImageDims({w:img.width,h:img.height});
-      setImagePreview(dataUrl);
-      setFullImg(dataUrl);
-      setCrop({x:0,y:0,w:1,h:1}); // relative 0..1, start full frame
-      setCropping(true);
-    };
-    img.src=dataUrl;
+    setError(null); setPdfStatus(null);
+    try{
+      const dataUrl=await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.target.result); r.onerror=()=>rej(new Error("read")); r.readAsDataURL(file); });
+      const img=new Image();
+      img.onload=()=>{
+        try{
+          const MAX=1600;
+          let w=img.width||1200, h=img.height||1600;
+          let scale=Math.min(1, MAX/Math.max(w,h));
+          const cw=Math.max(1,Math.round(w*scale)), ch=Math.max(1,Math.round(h*scale));
+          const canvas=document.createElement("canvas"); canvas.width=cw; canvas.height=ch;
+          const ctx=canvas.getContext("2d"); ctx.drawImage(img,0,0,cw,ch);
+          const jpeg=canvas.toDataURL("image/jpeg",0.85);
+          setImageDims({w:cw,h:ch});
+          setImagePreview(jpeg);
+          setCropData({ data:jpeg.split(",")[1], w:cw, h:ch });
+        }catch(err){ setError("Impossibile elaborare l'immagine. Riprova con un'altra foto."); }
+      };
+      img.onerror=()=>setError("Formato immagine non supportato. Prova a scattare una nuova foto.");
+      img.src=dataUrl;
+    }catch(err){ setError("Impossibile leggere il file. Riprova."); }
   },[]);
 
   const handleDrop=useCallback((e)=>{ e.preventDefault(); const file=e.dataTransfer.files[0]; if(file&&file.type.startsWith("image/")) handleImage(file); },[handleImage]);
 
-  // Render the cropped region to a JPEG, store base64 + dims for PDF
-  const confirmCrop=useCallback(()=>{
-    if(!fullImg||!crop||!imageDims) return;
-    const img=new Image();
-    img.onload=()=>{
-      const sx=Math.round(crop.x*imageDims.w), sy=Math.round(crop.y*imageDims.h);
-      const sw=Math.max(1,Math.round(crop.w*imageDims.w)), sh=Math.max(1,Math.round(crop.h*imageDims.h));
-      const canvas=document.createElement("canvas"); canvas.width=sw; canvas.height=sh;
-      const ctx=canvas.getContext("2d"); ctx.drawImage(img,sx,sy,sw,sh,0,0,sw,sh);
-      const dataUrl=canvas.toDataURL("image/jpeg",0.9);
-      setImagePreview(dataUrl);
-      setCropData({ data:dataUrl.split(",")[1], w:sw, h:sh });
-      setCropping(false);
-    };
-    img.src=fullImg;
-  },[fullImg,crop,imageDims]);
 
   const buildPdf=useCallback(()=>{
     if(!cropData) return null;
@@ -166,12 +160,15 @@ export default function ExpenseTracker(){
     const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download=pdfFilename(); a.click(); URL.revokeObjectURL(url); setPdfStatus("downloaded");
   },[buildPdf,form]);
 
-  const addExpense=()=>{
+  const makeThumb=(dataUrl)=>new Promise((res)=>{ try{ const img=new Image(); img.onload=()=>{ const t=120; let scale=Math.min(1,t/Math.max(img.width,img.height)); const w=Math.max(1,Math.round(img.width*scale)),h=Math.max(1,Math.round(img.height*scale)); const c=document.createElement("canvas"); c.width=w; c.height=h; c.getContext("2d").drawImage(img,0,0,w,h); res(c.toDataURL("image/jpeg",0.6)); }; img.onerror=()=>res(""); img.src=dataUrl; }catch(e){ res(""); } });
+
+  const addExpense=async()=>{
     if(!form.importo||!form.causale){ setError("Importo e causale sono obbligatori."); return; }
     setError(null);
-    const newExp={...form, importo:formatCurrency(form.importo), id:Date.now(), receiptThumb:imagePreview, pdfName:imagePreview?pdfFilename():""};
+    const thumb=imagePreview?await makeThumb(imagePreview):"";
+    const newExp={...form, importo:formatCurrency(form.importo), id:Date.now(), receiptThumb:thumb, pdfName:imagePreview?pdfFilename():""};
     setExpenses(prev=>[newExp,...prev]);
-    setForm(initialForm); setImagePreview(null); setFullImg(null); setCrop(null); setCropData(null); setCropping(false); setImageDims(null); setPdfStatus(null);
+    setForm(initialForm); setImagePreview(null); setCropData(null); setImageDims(null); setPdfStatus(null);
     setSaved(true); setTimeout(()=>setSaved(false),2000);
   };
 
@@ -223,7 +220,6 @@ export default function ExpenseTracker(){
       </div>
 
       <div style={{maxWidth:520,margin:"0 auto",padding:"24px 20px",paddingBottom:"calc(env(safe-area-inset-bottom, 0px) + 40px)"}}>
-        {!cropping && (
         <div onDrop={handleDrop} onDragOver={e=>e.preventDefault()} onClick={()=>fileRef.current?.click()} style={{border:`1px dashed ${imagePreview?C.gold:C.border}`,borderRadius:"12px",padding:imagePreview?"0":"32px 20px",textAlign:"center",cursor:"pointer",background:C.card,overflow:"hidden",marginBottom:"16px",transition:"border-color .2s"}}>
           <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>e.target.files[0]&&handleImage(e.target.files[0])}/>
           {imagePreview?(
@@ -234,22 +230,8 @@ export default function ExpenseTracker(){
             <><div style={{color:C.faint,marginBottom:"10px"}}><CameraIcon/></div><div style={{fontSize:"13px",color:C.dim,lineHeight:1.5}}>Tocca per scattare o scegliere la ricevuta<br/><span style={{fontSize:"11px",color:C.faint}}>foto, libreria o file</span></div></>
           )}
         </div>
-        )}
 
-        {cropping && fullImg && (
-          <div style={{marginBottom:"16px"}}>
-            <div style={{fontSize:"12px",color:C.gold,marginBottom:"8px",textAlign:"center"}}>Trascina gli angoli per ritagliare la ricevuta</div>
-            <CropBox src={fullImg} crop={crop} setCrop={setCrop} C={C}/>
-            <div style={{display:"flex",gap:"8px",marginTop:"10px"}}>
-              <button onClick={()=>{setCrop({x:0,y:0,w:1,h:1});}} style={{flex:1,padding:"10px",borderRadius:"9px",background:"transparent",border:`1px solid ${C.border}`,color:C.dim,fontSize:"12px",cursor:"pointer",fontFamily:"inherit"}}>Tutta la foto</button>
-              <button onClick={confirmCrop} style={{flex:2,padding:"10px",borderRadius:"9px",background:C.gold,border:"none",color:"#0f0f0f",fontSize:"13px",fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Conferma ritaglio</button>
-            </div>
-          </div>
-        )}
-
-        {imagePreview && !cropping && (<button onClick={()=>{setCropping(true);}} style={{width:"100%",padding:"9px",borderRadius:"10px",background:"transparent",border:`1px solid ${C.border}`,color:C.dim,fontSize:"12px",cursor:"pointer",fontFamily:"inherit",marginBottom:"10px"}}>Ritaglia di nuovo</button>)}
-
-        {imagePreview&&!cropping&&(<button onClick={savePdf} style={{width:"100%",padding:"11px",borderRadius:"10px",background:pdfStatus?"#1e3a20":"transparent",border:`1px solid ${pdfStatus?"#2e5a30":C.gold}`,color:pdfStatus?C.green:C.gold,fontSize:"13px",fontWeight:500,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:"8px",marginBottom:"20px"}}>{pdfStatus?<><CheckIcon/> PDF salvato</>:<><SaveIcon/> Salva PDF su Drive / File</>}</button>)}
+        {imagePreview&&(<button onClick={savePdf} style={{width:"100%",padding:"11px",borderRadius:"10px",background:pdfStatus?"#1e3a20":"transparent",border:`1px solid ${pdfStatus?"#2e5a30":C.gold}`,color:pdfStatus?C.green:C.gold,fontSize:"13px",fontWeight:500,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:"8px",marginBottom:"20px"}}>{pdfStatus?<><CheckIcon/> PDF salvato</>:<><SaveIcon/> Salva PDF su Drive / File</>}</button>)}
 
         {error&&<div style={{background:"#1a0e0e",border:"1px solid #3a1e1e",borderRadius:"8px",padding:"10px 14px",marginBottom:"16px",fontSize:"12px",color:"#e07070"}}>{error}</div>}
 
