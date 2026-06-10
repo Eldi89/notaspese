@@ -24,6 +24,7 @@ function slug(s){ return (s||"ricevuta").replace(/[^a-zA-Z0-9]+/g,"_").replace(/
 
 function ReceiptIcon(){return(<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 4v16l2-1 2 1 2-1 2 1 2-1 2 1 2-1V4l-2 1-2-1-2 1-2-1-2 1-2-1z"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg>);}
 function CameraIcon(){return(<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>);}
+function SpinnerIcon(){return(<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{animation:"spin 1s linear infinite"}}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>);}
 function CheckIcon(){return(<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>);}
 function TrashIcon(){return(<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>);}
 function ExportIcon(){return(<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>);}
@@ -57,6 +58,7 @@ function CropBox({src,crop,setCrop,C}){
     <div ref={ref} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp} onTouchMove={onMove} onTouchEnd={onUp}
       style={{position:"relative",width:"100%",maxHeight:360,userSelect:"none",touchAction:"none",background:"#000",borderRadius:"10px",overflow:"hidden"}}>
       <img src={src} alt="" style={{width:"100%",display:"block",maxHeight:360,objectFit:"contain",pointerEvents:"none"}}/>
+      <div style={{position:"absolute",inset:0,boxShadow:`0 0 0 9999px rgba(0,0,0,0.55)`,display:"none"}}/>
       <div onMouseDown={onDown("move")} onTouchStart={onDown("move")}
         style={{position:"absolute",left:pct(crop.x),top:pct(crop.y),width:pct(crop.w),height:pct(crop.h),border:`2px solid ${C.gold}`,boxShadow:"0 0 0 9999px rgba(0,0,0,0.5)",cursor:"move",touchAction:"none",boxSizing:"border-box"}}>
         {handle({left:0,top:0},"nwse-resize","nw")}
@@ -74,7 +76,7 @@ export default function ExpenseTracker(){
   const [imagePreview,setImagePreview]=useState(null);
   const [imageDims,setImageDims]=useState(null);
   const [fullImg,setFullImg]=useState(null);
-  const [crop,setCrop]=useState(null);
+  const [crop,setCrop]=useState(null); // {x,y,w,h} relative 0..1
   const [cropping,setCropping]=useState(false);
   const [cropData,setCropData]=useState(null);
   const [saved,setSaved]=useState(false);
@@ -100,7 +102,7 @@ export default function ExpenseTracker(){
       setImageDims({w:img.width,h:img.height});
       setImagePreview(dataUrl);
       setFullImg(dataUrl);
-      setCrop({x:0,y:0,w:1,h:1});
+      setCrop({x:0,y:0,w:1,h:1}); // relative 0..1, start full frame
       setCropping(true);
     };
     img.src=dataUrl;
@@ -108,6 +110,7 @@ export default function ExpenseTracker(){
 
   const handleDrop=useCallback((e)=>{ e.preventDefault(); const file=e.dataTransfer.files[0]; if(file&&file.type.startsWith("image/")) handleImage(file); },[handleImage]);
 
+  // Render the cropped region to a JPEG, store base64 + dims for PDF
   const confirmCrop=useCallback(()=>{
     if(!fullImg||!crop||!imageDims) return;
     const img=new Image();
@@ -201,6 +204,7 @@ export default function ExpenseTracker(){
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
         *{box-sizing:border-box;margin:0;padding:0;}
+        @keyframes spin{to{transform:rotate(360deg);}}
         @keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
         input,select,textarea{outline:none;}
         input::placeholder,textarea::placeholder{color:#555;}
